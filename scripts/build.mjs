@@ -1,0 +1,12 @@
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+await fs.mkdir('public/vendor',{recursive:true});
+await fs.mkdir('assets/licenses',{recursive:true});
+for(const [module,name]of [['ws','LICENSE'],['fflate','LICENSE'],['pdfjs-dist','LICENSE']])await fs.copyFile('node_modules/'+module+'/'+name,'assets/licenses/'+module+'-LICENSE.txt');
+await build({entryPoints:['src/app.mjs'],bundle:true,format:'esm',platform:'browser',target:'chrome144',minify:true,external:['/vendor/*'],outfile:'public/app.js'});
+const css=(await Promise.all(['styles','compact','desktop'].map(n=>fs.readFile('src/'+n+'.css','utf8')))).join('\n');await fs.writeFile('public/styles.css',css);
+for(const name of ['app-icon.png','icon-192.png','icon-512.png'])await fs.copyFile('assets/'+name,'public/'+name);
+for(const name of ['pdf.mjs','pdf.worker.mjs'])await fs.copyFile('node_modules/pdfjs-dist/legacy/build/'+name,'public/vendor/'+name);
+await fs.writeFile('public/index.html','<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Zashita</title><link rel="icon" href="/app-icon.png"><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head><body><div id="app"><p>正在打开 Zashita…</p></div></body></html>');
+await fs.writeFile('public/pcm-worklet.js',`class DefensePCM extends AudioWorkletProcessor{constructor(){super();this.buffer=new Float32Array(2048);this.used=0;this.port.onmessage=e=>{if(e.data?.flush){if(this.used)this.port.postMessage(this.buffer.slice(0,this.used));this.used=0;this.port.postMessage({flushed:true});}};}process(inputs){const frame=inputs[0]?.[0];if(frame)for(let i=0;i<frame.length;i++){this.buffer[this.used++]=frame[i];if(this.used===this.buffer.length){this.port.postMessage(this.buffer);this.used=0;}}return true;}}registerProcessor('defense-pcm',DefensePCM);`);
+console.log('Built standalone desktop assets');
