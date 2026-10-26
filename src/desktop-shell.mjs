@@ -1,0 +1,6 @@
+const desktop=globalThis.zashitaDesktop;
+if(!desktop?.isDesktop)throw Error('Zashita must run in its desktop window');
+document.documentElement.classList.toggle('desktop-glass',desktop.glass);
+const bar=document.createElement('div');bar.className='titlebar';bar.innerHTML=`<span class="window-caption">Zashita <span> /  DEFENSE DESK</span></span><div class="window-tools"><button id="glass-toggle" title="桌面磨砂透视" aria-label="桌面磨砂透视" aria-pressed="${desktop.glass}" ${desktop.glassSupported?'':'disabled'}>磨砂</button><button id="top-toggle" title="窗口置顶" aria-label="窗口置顶" aria-pressed="${desktop.alwaysOnTop}">置顶</button><button data-window="minimize" aria-label="最小化">—</button><button data-window="maximize" aria-label="最大化或还原">□</button><button class="close-window" data-window="close" aria-label="关闭程序">×</button></div>`;
+document.body.prepend(bar);
+bar.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||b.disabled)return;try{if(b.dataset.window)await desktop.window.command(b.dataset.window);else{const setting=b.id==='glass-toggle'?'glass':'top',value=b.getAttribute('aria-pressed')!=='true',result=await desktop.window.command(setting,value);b.setAttribute('aria-pressed',String(setting==='glass'?result.glass:result.alwaysOnTop));document.documentElement.classList.toggle('desktop-glass',result.glass);}}catch{b.title='窗口设置未完成，请重试';}});

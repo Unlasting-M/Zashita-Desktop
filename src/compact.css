@@ -1,0 +1,27 @@
+/* Landscape iPads retain visible answer text above the bottom navigation. */
+@media(min-width:651px) and (max-height:850px){
+ .brand{height:calc(56px + env(safe-area-inset-top))}
+ main{margin-top:calc(56px + env(safe-area-inset-top));padding-top:14px}
+ nav{top:calc(56px + env(safe-area-inset-top))}
+ .notice{padding:6px 12px;margin-bottom:12px;min-height:40px}
+ .notice button{min-height:30px}
+ h1{font-size:23px}
+ .page-head{margin-bottom:12px}
+ .page-head p{font-size:12px;margin-top:2px}
+ .live-controls{margin-bottom:10px}
+ .role-picker button{min-height:36px;padding-top:6px;padding-bottom:6px}
+ .reader{gap:10px}
+ .queue{padding:10px 14px}
+ .queue>div:first-child{margin-bottom:7px}
+ .queue-actions button,.queue select{min-height:40px}
+ .pane-switch button{min-height:34px;padding:6px}
+ .question-panel{padding:12px 18px}
+ .question-panel h2{font-size:18px;line-height:1.6;margin:6px 0}
+ .question-panel>p{font-size:13px}
+ .answer-heading{padding:12px 18px}
+ .answer-scroll{padding:16px 22px;max-height:50dvh}
+}
+@media(min-width:651px) and (max-width:1100px) and (max-height:850px){nav{top:auto}}
+@media(max-width:650px){main{padding-left:16px;padding-right:16px}.brand{padding-left:16px;padding-right:16px}}
+.answer-scroll:not(:has(.answer-ru)){min-height:120px}
+.settings-author{max-width:900px;padding:8px 0 12px;text-align:center;color:var(--muted);font-size:13px}
