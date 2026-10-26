@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import http from 'node:http';
+import {createCipheriv,createDecipheriv,randomBytes} from 'node:crypto';
+import WebSocket from 'ws';
+import {startLocalServer} from '../desktop/server.mjs';
+import {createVault} from '../desktop/vault.mjs';
+import {acquireAudio} from '../src/audio.mjs';
+const request=(origin,options={},body='')=>new Promise((resolve,reject)=>{const req=http.request(origin+ (options.pathname||'/api/chat'),options,res=>{let text='';res.on('data',v=>text+=v);res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,text}));});req.on('error',reject);req.end(body);});
+test('Local server rejects other origins, missing tokens, hostile hosts and oversized requests',async t=>{
+ const server=await startLocalServer({publicDir:path.resolve('public'),port:0,mock:true});t.after(()=>server.close());
+ const auth={Origin:server.origin,'X-Zashita-Session':server.token,'Content-Type':'application/json'};
+ const body=JSON.stringify({key:'sk-fake-local-test',operation:'answer',question:'что такое политика'});
+ for(const headers of [{},{...auth,Origin:'https://evil.invalid'},{...auth,Host:'evil.invalid'},{...auth,'X-Zashita-Session':'é'.repeat(server.token.length)}])assert.equal((await request(server.origin,{method:'POST',headers},body)).status,403);
+ assert.equal((await request(server.origin,{method:'POST',headers:auth},body)).status,200);
+ assert.equal(server.mockRequests.length,1);
+ assert.equal((await request(server.origin,{method:'POST',headers:auth},'x'.repeat(51000))).status,413);
+ assert.equal((await request(server.origin,{method:'POST',headers:auth},'{')).status,400);
+ const home=await request(server.origin,{pathname:'/'});assert.equal(home.status,200);assert.match(home.headers['content-security-policy'],/frame-ancestors 'none'/);assert.ok(!home.text.includes('chatgpt.site'));
+ assert.equal((await request(server.origin,{pathname:'/desktop/main.cjs'})).status,404);
+ assert.equal((await request(server.origin,{pathname:'/%2e%2e%2fpackage.json'})).status,404);
+});
+test('WebSocket handshake requires app origin and ephemeral subprotocol token',async t=>{
+ const server=await startLocalServer({publicDir:path.resolve('public'),port:0,mock:true});t.after(()=>server.close());
+ for(const protocols of [[],['zashita','wrong-token']])await new Promise((resolve,reject)=>{const ws=new WebSocket(server.origin.replace('http:','ws:')+'/api/asr',protocols,{origin:server.origin});ws.on('open',()=>reject(Error('Unauthorized socket opened')));ws.on('error',e=>{assert.match(e.message,/403/);resolve();});});
+ await new Promise((resolve,reject)=>{const ws=new WebSocket(server.origin.replace('http:','ws:')+'/api/asr',['zashita',server.token],{origin:server.origin});ws.on('open',()=>ws.close());ws.on('close',resolve);ws.on('error',reject);});
+});
+test('Vault survives restart, never writes plaintext and retains prior keys on encryption failure',async t=>{
+ const directory=await fs.mkdtemp(path.join(os.tmpdir(),'zashita-vault-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
+ const secret=randomBytes(32);let available=true;
+ const safeStorage={isEncryptionAvailable:()=>available,encryptString:s=>{const iv=randomBytes(12),c=createCipheriv('aes-256-gcm',secret,iv),data=Buffer.concat([c.update(s,'utf8'),c.final()]);return Buffer.concat([iv,c.getAuthTag(),data]);},decryptString:b=>{const d=createDecipheriv('aes-256-gcm',secret,b.subarray(0,12));d.setAuthTag(b.subarray(12,28));return Buffer.concat([d.update(b.subarray(28)),d.final()]).toString('utf8');}};
+ const keys={qwen:'sk-fake-qwen-secret',deepseek:'sk-fake-deepseek-secret'};
+ const vault=createVault({directory,safeStorage});await vault.save(keys);
+ assert.deepEqual(await createVault({directory,safeStorage}).load(),keys);
+ const file=path.join(directory,'cloud-credentials.json');assert.ok(!(await fs.readFile(file,'utf8')).includes('sk-fake'));
+ available=false;await assert.rejects(vault.save({...keys,qwen:'sk-replacement'}));available=true;assert.deepEqual(await vault.load(),keys);
+ await vault.save({...keys,qwen:'sk-updated-fake'});assert.equal((await vault.load()).qwen,'sk-updated-fake');
+ await vault.clear();assert.deepEqual(await vault.load(),{qwen:'',deepseek:''});
+});
+test('Selected microphone is exact; loopback immediately discards all video tracks',async()=>{
+ let constraints,videoStopped=false;const audio={kind:'audio'},video={stop:()=>videoStopped=true};
+ const stream={getVideoTracks:()=>[video],getAudioTracks:()=>[audio],getTracks:()=>[audio,video],removeTrack:t=>assert.equal(t,video)};
+ const devices={getUserMedia:async v=>{constraints=v;return stream;},getDisplayMedia:async v=>{assert.deepEqual(v,{audio:true,video:true});return stream;}};
+ await acquireAudio(devices,{deviceId:'uu-virtual-mic'});assert.deepEqual(constraints.audio.deviceId,{exact:'uu-virtual-mic'});assert.equal(constraints.video,false);
+ await acquireAudio(devices,{source:'system'});assert.equal(videoStopped,true);
+ await assert.rejects(acquireAudio(devices,{source:'invalid'}));
+});
