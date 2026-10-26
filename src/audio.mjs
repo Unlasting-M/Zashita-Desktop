@@ -22,7 +22,7 @@ export class Microphone{
    this.stream.getAudioTracks().forEach(track=>track.onended=()=>this.onFailure('麦克风已停止，请重新连接。'));
    const resampler=new PCM16Resampler(this.context.sampleRate);this.source=this.context.createMediaStreamSource(this.stream);
    const send=input=>{if(!this.context)return;const bytes=resampler.process(input),joined=new Uint8Array(this.pending.length+bytes.length);joined.set(this.pending);joined.set(bytes,this.pending.length);let offset=0;while(joined.length-offset>=3200){this.onFrame(joined.slice(offset,offset+3200));offset+=3200;}this.pending=joined.slice(offset);};
-   if(this.context.audioWorklet){await this.context.audioWorklet.addModule('/pcm-worklet.js');this.node=new AudioWorkletNode(this.context,'defense-pcm');this.node.port.onmessage=e=>{if(e.data?.flushed)this.flushResolve?.();else send(e.data);};}
+   if(this.context.audioWorklet){await this.context.audioWorklet.addModule('/pcm-worklet.js');this.node=new AudioWorkletNode(this.context,'defense-pcm',{channelCount:1,channelCountMode:'explicit',channelInterpretation:'speakers'});this.node.port.onmessage=e=>{if(e.data?.flushed)this.flushResolve?.();else send(e.data);};}
    else{this.node=this.context.createScriptProcessor(2048,1,1);this.node.onaudioprocess=e=>send(e.inputBuffer.getChannelData(0));}
    this.silence=this.context.createGain();this.silence.gain.value=0;this.source.connect(this.node);this.node.connect(this.silence);this.silence.connect(this.context.destination);
    this.context.onstatechange=()=>{if(this.context?.state==='interrupted')this.onFailure('系统中断了音频采集，请重新连接。');};
