@@ -1,0 +1,10 @@
+node_modules/
+public/
+assets/licenses/
+release/
+output/
+.taste-skill/
+.env*
+*.log
+*.tmp
+**/__pycache__/

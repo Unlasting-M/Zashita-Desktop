@@ -1,0 +1,84 @@
+{
+  "name": "zashita-desktop",
+  "version": "2.0.0",
+  "description": "Standalone Russian thesis defense assistant for Windows",
+  "private": true,
+  "type": "module",
+  "main": "desktop/main.cjs",
+  "author": "xinyu",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "test": "node --test tests/*.test.mjs",
+    "test:desktop": "node tests/desktop-qa.mjs",
+    "package:win": "node scripts/package.mjs",
+    "pretest": "npm run build"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
+    "fflate": "0.8.3",
+    "pdfjs-dist": "6.4.299",
+    "playwright-core": "1.58.2"
+  },
+  "build": {
+    "appId": "com.xinyu.zashita",
+    "productName": "Zashita",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**",
+      "src/backend.mjs",
+      "src/core.mjs",
+      "public/**",
+      "assets/app-icon.ico",
+      "package.json",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md"
+    ],
+    "win": {
+      "icon": "assets/app-icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "artifactName": "Zashita-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Zashita",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "Zashita-Portable-${version}-${arch}.${ext}"
+    },
+    "publish": null,
+    "extraResources": [
+      {
+        "from": "assets/licenses",
+        "to": "licenses"
+      }
+    ]
+  }
+}
